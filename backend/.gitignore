@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .env
 venv/
+# Ignore Firebase service account key
+serviceAccountKey.json

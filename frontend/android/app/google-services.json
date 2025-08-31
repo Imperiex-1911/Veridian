@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "812191093437",
+    "project_id": "veridian-app-19622",
+    "storage_bucket": "veridian-app-19622.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:812191093437:android:f3ea7ad059af21940c1dd4",
+        "android_client_info": {
+          "package_name": "com.example.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOqJ1wmQNYiZcpYo8gLzC1NwoNLRU6rqs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

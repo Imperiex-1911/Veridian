@@ -1,8 +1,8 @@
 # backend/main.py
 from fastapi import FastAPI
 
-app = FastAPI()
+app = FastAPI(title="Veridian API")
 
 @app.get("/")
-def read_root():
-    return {"Hello": "World"}
+async def root():
+    return {"message": "Veridian API"}
