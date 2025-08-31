@@ -1,26 +1,26 @@
 # backend/config/db.py
 import firebase_admin
 from firebase_admin import credentials, firestore
+from dotenv import load_dotenv
+from pathlib import Path
 import os
 
-# --- This block now uses a direct, hardcoded path ---
-# NOTE: This is for debugging or specific local setups.
-# The .env file is NOT used by this configuration.
+# This block robustly finds your .env file by creating an absolute path to it
+config_dir = Path(__file__).resolve().parent
+backend_dir = config_dir.parent
+dotenv_path = backend_dir / '.env'
+load_dotenv(dotenv_path=dotenv_path)
 
-cred_path = "C:/Home_audit/Veridian/backend/serviceAccountKey.json"
+# Load the credentials path from the environment
+cred_path_or_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if not cred_path_or_json:
+    raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable not set or .env file not found.")
 
-# A quick check to make sure the hardcoded file path actually exists.
-if not os.path.exists(cred_path):
-    raise FileNotFoundError(
-        f"The specified service account key file was not found at the hardcoded path: {cred_path}"
-    )
-
-# --- This block initializes Firebase ONCE, preventing crashes during hot-reload ---
+# This block initializes Firebase ONCE, preventing crashes during hot-reload
 try:
-    # Check if the app is already initialized to prevent errors
     firebase_admin.get_app()
 except ValueError:
-    cred = credentials.Certificate(cred_path)
+    cred = credentials.Certificate(cred_path_or_json)
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()

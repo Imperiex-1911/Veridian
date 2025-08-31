@@ -1,79 +1,51 @@
 # backend/scripts/seed.py
 import firebase_admin
-from firebase_admin import credentials, firestore, initialize_app
-import os
+from firebase_admin import credentials, firestore
+from dotenv import load_dotenv
 from pathlib import Path
+import os
 
-# --- START OF TEMPORARY DEBUGGING BLOCK ---
+print("Attempting to initialize Firebase and seed data...")
 
-print("--- RUNNING IN DEBUG MODE ---")
+# This block robustly finds your .env file
+backend_dir = Path(__file__).resolve().parent.parent
+dotenv_path = backend_dir / '.env'
+load_dotenv(dotenv_path=dotenv_path)
 
-# Please double-check that this path is EXACTLY correct on your system.
-cred_path = "C:/Home_audit/Veridian/backend/serviceAccountKey.json"
+cred_path_or_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if not cred_path_or_json:
+    raise ValueError("Failed to load GOOGLE_APPLICATION_CREDENTIALS from .env file.")
 
-# This check will give us a clearer error if the path is still wrong.
-if not os.path.exists(cred_path):
-    raise FileNotFoundError(f"DEBUG CHECK FAILED: The system cannot find the file at the hardcoded path: {cred_path}")
-
-print(f"DEBUG: Successfully found credentials file at the hardcoded path.")
-# --- END OF TEMPORARY DEBUGGING BLOCK ---
-
-
-# Initialize Firebase with the hardcoded path
-cred = credentials.Certificate(cred_path)
-
+# This block initializes Firebase ONCE
 try:
     firebase_admin.get_app()
 except ValueError:
-    initialize_app(cred)
+    cred = credentials.Certificate(cred_path_or_json)
+    firebase_admin.initialize_app(cred)
 
 db = firestore.client()
-print("Firestore client initialized.")
+print("Firestore client initialized successfully.")
 
-# ... the rest of your file (seeding data) stays the same ...
-
-try:
-    # Check if the app is already initialized to prevent errors
-    firebase_admin.get_app()
-except ValueError:
-    initialize_app(cred)
-
-db = firestore.client()
-print("Firestore client initialized.")
-
-# Data for seeding
+# --- This block seeds your data ---
 users_data = {
-    "email": "test@veridian.com",
-    "location": "CA, 90210",
-    "home_size_sqft": 2000,
-    "family_size": 4,
-    "annual_income": 80000,
-    "monthly_energy_bill": 150
+    "email": "test@veridian.com", "location": "CA, 90210", "home_size_sqft": 2000,
+    "family_size": 4, "annual_income": 80000, "monthly_energy_bill": 150
 }
-
 rebates_data = {
-    "title": "Veridian Solar Rebate",
-    "amount": 5000,
+    "title": "Veridian Solar Rebate", "amount": 5000,
     "eligibility_criteria": {"location": ["CA"], "income_max": 100000},
     "application_url": "http://example.com"
 }
-
 contractors_data = {
-    "name": "Veridian Solar Co",
-    "services": ["solar", "HVAC"],
-    "location": "CA",
-    "contact_email": "contact@veridiansolar.com",
-    "website": "http://veridiansolar.com"
+    "name": "Veridian Solar Co", "services": ["solar", "HVAC"], "location": "CA",
+    "contact_email": "contact@veridiansolar.com", "website": "http://veridiansolar.com"
 }
 
-# Seeding logic
 db.collection("users").document("test-user").set(users_data)
-print("Seeded test-user.")
-
+print("- Seeded test-user.")
 db.collection("rebates").document("rebate_001").set(rebates_data)
-print("Seeded rebate_001.")
-
+print("- Seeded rebate_001.")
 db.collection("contractors").document("contractor_001").set(contractors_data)
-print("Seeded contractor_001.")
+print("- Seeded contractor_001.")
 
-print("\nTest data seeded successfully!")
+print("\n✅ Test data seeded successfully!")
