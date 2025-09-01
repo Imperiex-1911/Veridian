@@ -1,0 +1,6 @@
+1. User opens app -> sees Login Screen.
+2. User enters email/password OR taps "Sign in with Google".
+3. On success -> navigates to Dashboard.
+4. Dashboard loads -> shows Carbon Footprint, Suggestions, Rebates.
+5. User taps "Audit" in bottom nav -> opens Audit Wizard.
+6. User completes steps -> results update Dashboard.
