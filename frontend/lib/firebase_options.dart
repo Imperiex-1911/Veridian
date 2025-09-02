@@ -78,11 +78,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions windows = FirebaseOptions(
     apiKey: 'AIzaSyCG23rEb_l5eo-CRgpu-FHPUaVGqxcXKVI',
-    appId: '1:812191093437:web:c1ec9086346fcba00c1dd4',
+    appId: '1:812191093437:web:a3a7bc11f9b0d5c90c1dd4',
     messagingSenderId: '812191093437',
     projectId: 'veridian-app-19622',
     authDomain: 'veridian-app-19622.firebaseapp.com',
     storageBucket: 'veridian-app-19622.firebasestorage.app',
-    measurementId: 'G-TG1092PDQR',
+    measurementId: 'G-D7C07TXJLM',
   );
 }
