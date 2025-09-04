@@ -20,7 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // State variable to show a loading spinner
   bool _isLoading = false;
 
   final _emailController = TextEditingController();
@@ -34,7 +33,6 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      // On success, AuthWrapper handles navigation to the Dashboard.
     } on FirebaseAuthException catch (e) {
       _showError("Login failed: ${e.message}");
     } finally {
@@ -50,7 +48,6 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      // After creating the user, check their profile.
       await _verifyAndCheckProfile(userCredential.user);
     } on FirebaseAuthException catch (e) {
       _showError("Sign-up failed: ${e.message}");
@@ -59,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // --- Logic for Google Sign-In (handles both new and existing users) ---
+  // --- Logic for Google Sign-In ---
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
@@ -69,7 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (googleUser == null) {
         if (mounted) setState(() => _isLoading = false);
-        return; // User cancelled the sign-in
+        return;
       }
 
       final googleAuth = await googleUser.authentication;
@@ -79,12 +76,9 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       final userCredential = await _auth.signInWithCredential(credential);
 
-      // Crucially, check if this is the user's first time signing in
       if (userCredential.additionalUserInfo?.isNewUser == true) {
         await _verifyAndCheckProfile(userCredential.user);
       }
-      // If it's an existing user, the AuthWrapper will handle navigation automatically.
-
     } catch (e) {
       _showError("Google Sign-In failed: $e");
     } finally {
@@ -92,29 +86,47 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // This function is now only called for NEW users to check for a profile
+  // --- THIS IS THE UPDATED FUNCTION WITH DEBUGGING STATEMENTS ---
   Future<void> _verifyAndCheckProfile(User? user) async {
     if (user == null) return;
+    print("DEBUG 1: Starting profile check for new user: ${user.uid}");
 
     final idToken = await user.getIdToken();
-    final response = await http.post(
-      Uri.parse('https://veridian-api-1jzx.onrender.com/auth/me'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $idToken',
-      },
-    );
+    print("DEBUG 2: Calling backend for verification...");
 
-    if (response.statusCode != 200) {
-      _showError("Backend token verification failed. Status: ${response.statusCode}");
-      return;
-    }
-
-    final doc = await _db.collection('users').doc(user.uid).get();
-    if (!doc.exists && mounted) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (context) => const ProfileFormScreen()),
+    try {
+      final response = await http.post(
+        Uri.parse('https://veridian-api-1jzx.onrender.com/auth/me'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
       );
+
+      print("DEBUG 3: Backend response received. Status code: ${response.statusCode}");
+      print("DEBUG 4: Backend response body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        print("DEBUG 5: Backend verification successful. Checking Firestore...");
+        final doc = await _db.collection('users').doc(user.uid).get();
+
+        if (!doc.exists) {
+          print("DEBUG 6: SUCCESS! Profile does NOT exist. Navigating to ProfileFormScreen.");
+          if (mounted) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const ProfileFormScreen()),
+            );
+          }
+        } else {
+          print("DEBUG 7: LOGIC ERROR? A profile document already exists for this new user.");
+        }
+      } else {
+        print("DEBUG 8: FAILURE! Backend verification failed.");
+        _showError("Backend verification failed. See console for details.");
+      }
+    } catch (e) {
+      print("DEBUG 9: CRITICAL FAILURE! An error occurred during the HTTP call: $e");
+      _showError("A critical error occurred: $e");
     }
   }
 
@@ -133,7 +145,6 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
-          // Show a loading spinner if _isLoading is true
           child: _isLoading
               ? const CircularProgressIndicator()
               : Column(
@@ -151,7 +162,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: const InputDecoration(labelText: 'Password'),
               ),
               const SizedBox(height: 20),
-              // Separate buttons for Login and Sign Up
               ElevatedButton(
                 onPressed: _signInWithEmail,
                 child: const Text('Login'),
@@ -165,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const Divider(),
               const SizedBox(height: 10),
               ElevatedButton.icon(
-                icon: const Icon(Icons.login), // Example of adding an icon
+                icon: const Icon(Icons.login),
                 onPressed: _signInWithGoogle,
                 label: const Text('Sign in with Google'),
               ),
