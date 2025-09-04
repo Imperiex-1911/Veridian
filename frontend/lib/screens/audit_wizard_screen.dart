@@ -1,66 +1,213 @@
+// lib/screens/audit_wizard_screen.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuditWizardScreen extends StatefulWidget {
+  const AuditWizardScreen({super.key});
+
   @override
-  _AuditWizardScreenState createState() => _AuditWizardScreenState();
+  State<AuditWizardScreen> createState() => _AuditWizardScreenState();
 }
 
 class _AuditWizardScreenState extends State<AuditWizardScreen> {
   int _currentStep = 0;
-  String? _insulationQuality;
+  final Map<String, dynamic> _answers = {};
+
+  // --- THIS IS THE UPDATED SUBMIT FUNCTION ---
+  Future<void> _submitAudit() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: You must be logged in to submit an audit.')),
+      );
+      return;
+    }
+
+    try {
+      // Add the audit data to the 'audits' collection
+      await FirebaseFirestore.instance.collection('audits').add({
+        'user_id': user.uid, // Link the audit to the user
+        'answers': _answers, // The map of answers we collected
+        'timestamp': Timestamp.now(), // So we can find the latest one
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Audit saved successfully!')),
+      );
+      // Go back to the previous screen (the dashboard)
+      Navigator.of(context).pop();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save audit: $e')),
+      );
+    }
+  }
+
+  // --- The rest of the file remains the same ---
+  bool get _showHeatingQuestion => _answers['insulation'] == 'poor';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Self-Audit Wizard')),
+      appBar: AppBar(
+        title: const Text('Self-Audit Wizard'),
+      ),
       body: Stepper(
+        type: StepperType.vertical,
         currentStep: _currentStep,
-        onStepContinue: _currentStep < 1 ? () => setState(() => _currentStep++) : null,
-        onStepCancel: _currentStep > 0 ? () => setState(() => _currentStep--) : null,
-        controlsBuilder: (context, details) {
-          return Row(
-            children: [
-              if (details.currentStep > 0)
-                TextButton(onPressed: details.onStepCancel, child: Text('Back')),
-              Spacer(),
-              TextButton(onPressed: details.onStepContinue, child: Text('Next')),
-            ],
-          );
+        onStepContinue: () {
+          if (_currentStep < 4) {
+            setState(() => _currentStep++);
+          } else {
+            _submitAudit();
+          }
+        },
+        onStepCancel: () {
+          if (_currentStep > 0) {
+            setState(() => _currentStep--);
+          }
         },
         steps: [
-          Step(
-            title: Text('Step 1 of 5: Insulation'),
-            content: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('What type of insulation do you have?'),
-                RadioListTile(
-                  title: Text('Good'),
-                  value: 'good',
-                  groupValue: _insulationQuality,
-                  onChanged: (value) => setState(() => _insulationQuality = value as String),
-                ),
-                RadioListTile(
-                  title: Text('Average'),
-                  value: 'average',
-                  groupValue: _insulationQuality,
-                  onChanged: (value) => setState(() => _insulationQuality = value as String),
-                ),
-                RadioListTile(
-                  title: Text('Poor'),
-                  value: 'poor',
-                  groupValue: _insulationQuality,
-                  onChanged: (value) => setState(() => _insulationQuality = value as String),
-                ),
-              ],
-            ),
+          _buildStep1Appliances(),
+          _buildStep2Insulation(),
+          _buildStep3Windows(),
+          _buildStep4Heating(),
+          _buildStep5Summary(),
+        ],
+      ),
+    );
+  }
+
+  // Helper methods (_buildStep1Appliances, etc.) are unchanged...
+  Step _buildStep1Appliances() {
+    return Step(
+      title: const Text('Step 1: Appliances'),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('How old is your primary refrigerator?'),
+          RadioListTile<String>(
+            title: const Text('< 5 years'),
+            value: 'new',
+            groupValue: _answers['fridge_age'],
+            onChanged: (value) => setState(() => _answers['fridge_age'] = value),
           ),
-          Step(
-            title: Text('Step 2 of 5: Appliances'),
-            content: Text('Placeholder: Appliance questions'),
+          RadioListTile<String>(
+            title: const Text('5 - 15 years'),
+            value: 'medium',
+            groupValue: _answers['fridge_age'],
+            onChanged: (value) => setState(() => _answers['fridge_age'] = value),
+          ),
+          RadioListTile<String>(
+            title: const Text('> 15 years'),
+            value: 'old',
+            groupValue: _answers['fridge_age'],
+            onChanged: (value) => setState(() => _answers['fridge_age'] = value),
           ),
         ],
       ),
+      isActive: _currentStep >= 0,
+    );
+  }
+
+  Step _buildStep2Insulation() {
+    return Step(
+      title: const Text('Step 2: Insulation'),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('How would you rate your home\'s insulation?'),
+          RadioListTile<String>(
+            title: const Text('Good'),
+            value: 'good',
+            groupValue: _answers['insulation'],
+            onChanged: (value) => setState(() => _answers['insulation'] = value),
+          ),
+          RadioListTile<String>(
+            title: const Text('Average'),
+            value: 'average',
+            groupValue: _answers['insulation'],
+            onChanged: (value) => setState(() => _answers['insulation'] = value),
+          ),
+          RadioListTile<String>(
+            title: const Text('Poor'),
+            value: 'poor',
+            groupValue: _answers['insulation'],
+            onChanged: (value) => setState(() => _answers['insulation'] = value),
+          ),
+        ],
+      ),
+      isActive: _currentStep >= 1,
+    );
+  }
+
+  Step _buildStep3Windows() {
+    return Step(
+      title: const Text('Step 3: Windows'),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('What type of windows do you have?'),
+          RadioListTile<String>(
+            title: const Text('Single-pane'),
+            value: 'single',
+            groupValue: _answers['windows'],
+            onChanged: (value) => setState(() => _answers['windows'] = value),
+          ),
+          RadioListTile<String>(
+            title: const Text('Double-pane'),
+            value: 'double',
+            groupValue: _answers['windows'],
+            onChanged: (value) => setState(() => _answers['windows'] = value),
+          ),
+        ],
+      ),
+      isActive: _currentStep >= 2,
+    );
+  }
+
+  Step _buildStep4Heating() {
+    return Step(
+      title: const Text('Step 4: Heating/Cooling'),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_showHeatingQuestion)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Your insulation is poor. How efficient is your heating system?'),
+                Slider(
+                  value: (_answers['heating_efficiency'] ?? 50.0).toDouble(),
+                  min: 0,
+                  max: 100,
+                  divisions: 10,
+                  label: (_answers['heating_efficiency'] ?? 50.0).toInt().toString(),
+                  onChanged: (value) => setState(() => _answers['heating_efficiency'] = value),
+                ),
+              ],
+            )
+          else
+            const Text('Your insulation rating is good enough that we don\'t need more heating details.'),
+        ],
+      ),
+      isActive: _currentStep >= 3,
+    );
+  }
+
+  Step _buildStep5Summary() {
+    return Step(
+      title: const Text('Step 5: Summary'),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Please review your answers before submitting:'),
+          const SizedBox(height: 10),
+          Text(_answers.toString()),
+        ],
+      ),
+      isActive: _currentStep >= 4,
     );
   }
 }

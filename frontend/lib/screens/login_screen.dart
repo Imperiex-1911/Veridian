@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'profile_form_screen.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -17,25 +19,58 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  bool _showProfileForm = false; // This will control which form is visible
 
-  // Controllers for the forms
+  // State variable to show a loading spinner
+  bool _isLoading = false;
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _homeSizeController = TextEditingController();
 
-  // --- Authentication Logic ---
-
-  Future<void> _signInWithGoogle() async {
+  // --- Logic for an EXISTING user logging in ---
+  Future<void> _signInWithEmail() async {
+    setState(() => _isLoading = true);
     try {
-      // --- THIS IS THE CORRECTED LINE ---
-      // We pass the clientId directly to the GoogleSignIn constructor.
+      await _auth.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      // On success, AuthWrapper handles navigation to the Dashboard.
+    } on FirebaseAuthException catch (e) {
+      _showError("Login failed: ${e.message}");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- Logic for a NEW user signing up ---
+  Future<void> _signUpWithEmail() async {
+    setState(() => _isLoading = true);
+    try {
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      // After creating the user, check their profile.
+      await _verifyAndCheckProfile(userCredential.user);
+    } on FirebaseAuthException catch (e) {
+      _showError("Sign-up failed: ${e.message}");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- Logic for Google Sign-In (handles both new and existing users) ---
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
       final googleUser = await GoogleSignIn(
         clientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
       ).signIn();
 
-      if (googleUser == null) return; // User cancelled the flow
+      if (googleUser == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return; // User cancelled the sign-in
+      }
 
       final googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
@@ -43,27 +78,21 @@ class _LoginScreenState extends State<LoginScreen> {
         idToken: googleAuth.idToken,
       );
       final userCredential = await _auth.signInWithCredential(credential);
-      await _verifyAndCheckProfile(userCredential.user);
+
+      // Crucially, check if this is the user's first time signing in
+      if (userCredential.additionalUserInfo?.isNewUser == true) {
+        await _verifyAndCheckProfile(userCredential.user);
+      }
+      // If it's an existing user, the AuthWrapper will handle navigation automatically.
+
     } catch (e) {
       _showError("Google Sign-In failed: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // NOTE: You will need to enable Email/Password sign-up in Firebase Auth for this to work.
-  Future<void> _signUpWithEmail() async {
-    try {
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
-      await _verifyAndCheckProfile(userCredential.user);
-    } catch (e) {
-      _showError("Sign-up failed: $e");
-    }
-  }
-
-  // --- Backend and Database Logic ---
-
+  // This function is now only called for NEW users to check for a profile
   Future<void> _verifyAndCheckProfile(User? user) async {
     if (user == null) return;
 
@@ -82,26 +111,11 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     final doc = await _db.collection('users').doc(user.uid).get();
-
-    if (!doc.exists) {
-      setState(() {
-        _showProfileForm = true;
-      });
+    if (!doc.exists && mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => const ProfileFormScreen()),
+      );
     }
-  }
-
-  Future<void> _saveProfile() async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    await _db.collection('users').doc(user.uid).set({
-      'email': user.email,
-      'location': _locationController.text,
-      'home_size_sqft': int.tryParse(_homeSizeController.text) ?? 0,
-      'family_size': 0,
-      'annual_income': 0,
-      'monthly_energy_bill': 0,
-    });
   }
 
   void _showError(String message) {
@@ -112,7 +126,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // --- UI Building ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -120,39 +133,46 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
-          child: _showProfileForm ? _buildProfileForm() : _buildLoginForm(),
+          // Show a loading spinner if _isLoading is true
+          child: _isLoading
+              ? const CircularProgressIndicator()
+              : Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Password'),
+              ),
+              const SizedBox(height: 20),
+              // Separate buttons for Login and Sign Up
+              ElevatedButton(
+                onPressed: _signInWithEmail,
+                child: const Text('Login'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton(
+                onPressed: _signUpWithEmail,
+                child: const Text('Sign Up'),
+              ),
+              const SizedBox(height: 10),
+              const Divider(),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.login), // Example of adding an icon
+                onPressed: _signInWithGoogle,
+                label: const Text('Sign in with Google'),
+              ),
+            ],
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _buildLoginForm() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        TextField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email')),
-        const SizedBox(height: 10),
-        TextField(controller: _passwordController, obscureText: true, decoration: const InputDecoration(labelText: 'Password')),
-        const SizedBox(height: 20),
-        ElevatedButton(onPressed: _signUpWithEmail, child: const Text('Sign Up with Email')),
-        const SizedBox(height: 10),
-        ElevatedButton(onPressed: _signInWithGoogle, child: const Text('Sign in with Google')),
-      ],
-    );
-  }
-
-  Widget _buildProfileForm() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text('Complete Your Profile', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 20),
-        TextField(controller: _locationController, decoration: const InputDecoration(labelText: 'Location (e.g., CA, 90210)')),
-        const SizedBox(height: 10),
-        TextField(controller: _homeSizeController, decoration: const InputDecoration(labelText: 'Home Size (sqft)'), keyboardType: TextInputType.number),
-        const SizedBox(height: 20),
-        ElevatedButton(onPressed: _saveProfile, child: const Text('Save Profile')),
-      ],
     );
   }
 }
