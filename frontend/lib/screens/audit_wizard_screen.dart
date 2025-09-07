@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'home_screen.dart'; // 1. IMPORT THE HOME SCREEN
 
 class AuditWizardScreen extends StatefulWidget {
   const AuditWizardScreen({super.key});
@@ -13,38 +14,41 @@ class AuditWizardScreen extends StatefulWidget {
 class _AuditWizardScreenState extends State<AuditWizardScreen> {
   int _currentStep = 0;
   final Map<String, dynamic> _answers = {};
+  bool _isLoading = false; // 2. ADD LOADING STATE
 
-  // --- THIS IS THE UPDATED SUBMIT FUNCTION ---
   Future<void> _submitAudit() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: You must be logged in to submit an audit.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: User not logged in.')));
       return;
     }
 
+    setState(() => _isLoading = true);
+
     try {
-      // Add the audit data to the 'audits' collection
       await FirebaseFirestore.instance.collection('audits').add({
-        'user_id': user.uid, // Link the audit to the user
-        'answers': _answers, // The map of answers we collected
-        'timestamp': Timestamp.now(), // So we can find the latest one
+        'user_id': user.uid,
+        'answers': _answers,
+        'timestamp': Timestamp.now(),
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Audit saved successfully!')),
-      );
-      // Go back to the previous screen (the dashboard)
-      Navigator.of(context).pop();
+      if (mounted) {
+        // 3. USE ROBUST NAVIGATION
+        // This clears the old screens and navigates to a fresh HomeScreen.
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) =>  HomeScreen()),
+              (route) => false,
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save audit: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save audit: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // --- The rest of the file remains the same ---
   bool get _showHeatingQuestion => _answers['insulation'] == 'poor';
 
   @override
@@ -53,7 +57,9 @@ class _AuditWizardScreenState extends State<AuditWizardScreen> {
       appBar: AppBar(
         title: const Text('Self-Audit Wizard'),
       ),
-      body: Stepper(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Stepper(
         type: StepperType.vertical,
         currentStep: _currentStep,
         onStepContinue: () {
@@ -79,7 +85,8 @@ class _AuditWizardScreenState extends State<AuditWizardScreen> {
     );
   }
 
-  // Helper methods (_buildStep1Appliances, etc.) are unchanged...
+  // --- Helper methods to build each step ---
+  // (These methods _buildStep1Appliances, etc., are unchanged)
   Step _buildStep1Appliances() {
     return Step(
       title: const Text('Step 1: Appliances'),

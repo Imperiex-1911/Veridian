@@ -2,12 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
-import 'profile_form_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,14 +13,13 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   bool _isLoading = false;
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  // --- Logic for an EXISTING user logging in ---
+  // --- Existing user login ---
   Future<void> _signInWithEmail() async {
     setState(() => _isLoading = true);
     try {
@@ -33,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      // ✅ AuthWrapper will take over after login
     } on FirebaseAuthException catch (e) {
       _showError("Login failed: ${e.message}");
     } finally {
@@ -40,15 +35,15 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // --- Logic for a NEW user signing up ---
+  // --- New user sign-up ---
   Future<void> _signUpWithEmail() async {
     setState(() => _isLoading = true);
     try {
-      final userCredential = await _auth.createUserWithEmailAndPassword(
+      await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      await _verifyAndCheckProfile(userCredential.user);
+      // ✅ AuthWrapper will detect user and check profile
     } on FirebaseAuthException catch (e) {
       _showError("Sign-up failed: ${e.message}");
     } finally {
@@ -56,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // --- Logic for Google Sign-In ---
+  // --- Google Sign-In ---
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
@@ -66,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (googleUser == null) {
         if (mounted) setState(() => _isLoading = false);
-        return;
+        return; // user cancelled
       }
 
       final googleAuth = await googleUser.authentication;
@@ -74,59 +69,12 @@ class _LoginScreenState extends State<LoginScreen> {
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      final userCredential = await _auth.signInWithCredential(credential);
-
-      if (userCredential.additionalUserInfo?.isNewUser == true) {
-        await _verifyAndCheckProfile(userCredential.user);
-      }
+      await _auth.signInWithCredential(credential);
+      // ✅ AuthWrapper will take over after login
     } catch (e) {
       _showError("Google Sign-In failed: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // --- THIS IS THE UPDATED FUNCTION WITH DEBUGGING STATEMENTS ---
-  Future<void> _verifyAndCheckProfile(User? user) async {
-    if (user == null) return;
-    print("DEBUG 1: Starting profile check for new user: ${user.uid}");
-
-    final idToken = await user.getIdToken();
-    print("DEBUG 2: Calling backend for verification...");
-
-    try {
-      final response = await http.post(
-        Uri.parse('https://veridian-api-1jzx.onrender.com/auth/me'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $idToken',
-        },
-      );
-
-      print("DEBUG 3: Backend response received. Status code: ${response.statusCode}");
-      print("DEBUG 4: Backend response body: ${response.body}");
-
-      if (response.statusCode == 200) {
-        print("DEBUG 5: Backend verification successful. Checking Firestore...");
-        final doc = await _db.collection('users').doc(user.uid).get();
-
-        if (!doc.exists) {
-          print("DEBUG 6: SUCCESS! Profile does NOT exist. Navigating to ProfileFormScreen.");
-          if (mounted) {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => const ProfileFormScreen()),
-            );
-          }
-        } else {
-          print("DEBUG 7: LOGIC ERROR? A profile document already exists for this new user.");
-        }
-      } else {
-        print("DEBUG 8: FAILURE! Backend verification failed.");
-        _showError("Backend verification failed. See console for details.");
-      }
-    } catch (e) {
-      print("DEBUG 9: CRITICAL FAILURE! An error occurred during the HTTP call: $e");
-      _showError("A critical error occurred: $e");
     }
   }
 

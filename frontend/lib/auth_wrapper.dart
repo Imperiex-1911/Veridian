@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/profile_form_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
@@ -11,12 +13,38 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // If the user is logged in, show the main app screen
-        if (snapshot.hasData) {
-          return HomeScreen();
+        // Waiting for FirebaseAuth to resolve
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
         }
-        // Otherwise, show the login screen
-        return  LoginScreen();
+
+        // Not logged in → show login
+        if (!snapshot.hasData) {
+          return const LoginScreen();
+        }
+
+        final user = snapshot.data!;
+
+        // 🔥 Check Firestore for profile existence
+        return FutureBuilder<DocumentSnapshot>(
+          future: FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get(),
+          builder: (context, profileSnapshot) {
+            if (profileSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            // New user (no profile) → show profile form
+            if (!profileSnapshot.hasData || !profileSnapshot.data!.exists) {
+              return const ProfileFormScreen();
+            }
+
+            // Existing user with profile → show home
+            return  HomeScreen();
+          },
+        );
       },
     );
   }
