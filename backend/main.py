@@ -1,25 +1,23 @@
 # backend/main.py
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware # --- 1. IMPORT THIS ---
-from routes import auth, users
+from fastapi.middleware.cors import CORSMiddleware
+from routes import auth, users, rebates # 1. IMPORT THE NEW REBATES ROUTER
 
 app = FastAPI(title="Veridian API")
 
-# --- 2. ADD THIS MIDDLEWARE BLOCK ---
-# This block tells your backend that it's okay to accept requests
-# from your Flutter web app, fixing the CORS error.
+# Your CORS middleware (no changes here)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins for simplicity in development
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods (GET, POST, etc.)
-    allow_headers=["*"],  # Allows all headers (like 'Authorization')
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-# --- END OF NEW BLOCK ---
 
-# Your existing router configuration
+# --- Your Router Configuration ---
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
+app.include_router(rebates.router, prefix="/rebates", tags=["Rebates"]) # 2. ADD THE REBATES ROUTER
 
 @app.get("/")
 async def root():
