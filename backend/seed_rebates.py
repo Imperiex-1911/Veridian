@@ -16,219 +16,154 @@ except ValueError:
     pass
 db = firestore.client()
 
+# Your comprehensive rebate list, now fully structured for the API
 rebates = [
     # Federal
     {
         "id": "federal_sres",
         "name": "Small-scale Renewable Energy Scheme (SRES)",
-        "level": "federal",
-        "benefit": "STC subsidy for solar/wind/hydro/hot water",
-        "region": "All states/territories",
+        "description": "STC subsidy for solar/wind/hydro/hot water, provided as a point-of-sale discount.",
+        "amount": 4000,
+        "location": "AUS",
+        "income_max": 300000
     },
     {
         "id": "federal_energy_bill_relief_2025",
         "name": "Energy Bill Relief Fund Extension 2025",
-        "level": "federal",
-        "benefit": "Up to A$150 rebate (2×A$75 installments)",
-        "region": "All states/territories",
+        "description": "Up to A$300 rebate applied directly to electricity bills for eligible households.",
+        "amount": 300,
+        "location": "AUS",
+        "income_max": 300000
     },
     # ACT
     {
         "id": "act_access_to_electric",
         "name": "Access to Electric Program",
-        "level": "territory",
-        "benefit": "Fully funded electrification/upgrades for hardship cases",
-        "region": "ACT",
+        "description": "Fully funded electrification/upgrades for hardship cases and low-income households.",
+        "amount": 5000,
+        "location": "ACT",
+        "income_max": 75000
     },
     {
         "id": "act_fridge_buyback",
         "name": "Fridge Buyback Program",
-        "level": "territory",
-        "benefit": "Free removal + A$30 electricity rebate",
-        "region": "ACT",
-    },
-    {
-        "id": "act_life_support",
-        "name": "ACT Life Support Rebate",
-        "level": "territory",
-        "benefit": "Support rebate for life-support equipment users",
-        "region": "ACT",
-    },
-    {
-        "id": "act_cds",
-        "name": "ACT Container Deposit Scheme",
-        "level": "territory",
-        "benefit": "A$0.10 per eligible container",
-        "region": "ACT",
+        "description": "Free removal of an old, inefficient fridge plus a $30 electricity rebate.",
+        "amount": 30,
+        "location": "ACT",
+        "income_max": 300000
     },
     # NSW
     {
         "id": "nsw_low_income_rebate",
         "name": "NSW Low Income Energy Rebate",
-        "level": "state",
-        "benefit": "~A$285/year for low income households",
-        "region": "NSW",
+        "description": "An annual rebate of approximately $285 for low income households.",
+        "amount": 285,
+        "location": "NSW",
+        "income_max": 75000
     },
     {
         "id": "nsw_gas_rebate",
         "name": "NSW Gas Rebate",
-        "level": "state",
-        "benefit": "A$110/year",
-        "region": "NSW",
-    },
-    {
-        "id": "nsw_medical_energy_rebate",
-        "name": "NSW Medical Energy Rebate",
-        "level": "state",
-        "benefit": "Up to A$285/year for eligible medical needs",
-        "region": "NSW",
+        "description": "An annual rebate of $110 to help eligible households with their gas bills.",
+        "amount": 110,
+        "location": "NSW",
+        "income_max": 300000
     },
     # VIC
     {
         "id": "vic_veu",
         "name": "Victorian Energy Upgrades (VEU)",
-        "level": "state",
-        "benefit": "Rebates on energy-efficient products (lighting, heating, etc.)",
-        "region": "VIC",
+        "description": "Provides discounts on energy-efficient products like lighting, heating, and hot water systems.",
+        "amount": 800,
+        "location": "VIC",
+        "income_max": 300000
     },
     {
         "id": "vic_solar_homes",
         "name": "Solar Homes Program",
-        "level": "state",
-        "benefit": "A$1,400 solar / A$1,000 hot water / A$3,500 battery rebates + loans",
-        "region": "VIC",
+        "description": "$1,400 rebate for solar panels, with options for hot water and batteries.",
+        "amount": 1400,
+        "location": "VIC",
+        "income_max": 210000
     },
     {
         "id": "vic_power_saving_bonus",
         "name": "Power Saving Bonus",
-        "level": "state",
-        "benefit": "A$250 one-off rebate via Energy Compare",
-        "region": "VIC",
-    },
-    {
-        "id": "vic_cds",
-        "name": "Victoria Container Deposit Scheme",
-        "level": "state",
-        "benefit": "A$0.10 per container",
-        "region": "VIC",
+        "description": "A $250 one-off rebate for households who use the Victorian Energy Compare website.",
+        "amount": 250,
+        "location": "VIC",
+        "income_max": 300000
     },
     # QLD
     {
-        "id": "qld_electricity_rebate",
-        "name": "Queensland Electricity Rebate",
-        "level": "state",
-        "benefit": "A$372/year",
-        "region": "QLD",
-    },
-    {
         "id": "qld_cost_of_living_rebate",
         "name": "QLD Cost of Living Electricity Rebate",
-        "level": "state",
-        "benefit": "Up to A$1,000/year",
-        "region": "QLD",
+        "description": "A significant rebate of up to $1,000 per year applied directly to household electricity bills.",
+        "amount": 1000,
+        "location": "QLD",
+        "income_max": 300000
     },
     {
         "id": "qld_appliance_rebate",
         "name": "QLD Appliance Energy Efficiency Rebate",
-        "level": "state",
-        "benefit": "A$300–A$1,000 for efficient appliances",
-        "region": "QLD",
-    },
-    {
-        "id": "qld_peak_smart_ac",
-        "name": "QLD PeakSmart AC Incentive",
-        "level": "state",
-        "benefit": "Up to A$400",
-        "region": "QLD",
-    },
-    {
-        "id": "qld_cds",
-        "name": "QLD Containers for Change (CDS)",
-        "level": "state",
-        "benefit": "A$0.10 per container; includes wine/spirit bottles",
-        "region": "QLD",
+        "description": "Rebates from $300 to $1,000 for purchasing new, energy-efficient appliances.",
+        "amount": 1000,
+        "location": "QLD",
+        "income_max": 180000
     },
     # SA
     {
         "id": "sa_reps",
         "name": "SA Retailer Energy Productivity Scheme (REPS)",
-        "level": "state",
-        "benefit": "Lower energy costs for households & businesses",
-        "region": "SA",
-    },
-    {
-        "id": "sa_cds",
-        "name": "SA Container Deposit Scheme",
-        "level": "state",
-        "benefit": "A$0.10 per container; expanding container types",
-        "region": "SA",
+        "description": "Incentives for households to install energy-saving measures, offered via energy retailers.",
+        "amount": 500,
+        "location": "SA",
+        "income_max": 250000
     },
     # WA
     {
         "id": "wa_eces",
         "name": "WA Energy Concession Extension Scheme",
-        "level": "state",
-        "benefit": "~A$326/year + child & AC rebates",
-        "region": "WA",
-    },
-    {
-        "id": "wa_cds",
-        "name": "WA Containers for Change (CDS)",
-        "level": "state",
-        "benefit": "A$0.10 per container",
-        "region": "WA",
+        "description": "Provides an annual electricity concession of approximately $326 for eligible households.",
+        "amount": 326,
+        "location": "WA",
+        "income_max": 75000
     },
     # TAS
     {
-        "id": "tas_concession",
-        "name": "Tasmania Electricity Concession",
-        "level": "state",
-        "benefit": "Daily discount (~172 cents/day)",
-        "region": "TAS",
-    },
-    {
         "id": "tas_heating_allowance",
         "name": "Tasmania Heating Allowance",
-        "level": "state",
-        "benefit": "A$56/year for pensioners",
-        "region": "TAS",
-    },
-    {
-        "id": "tas_ebrf",
-        "name": "Tasmania EBRF Top-Up",
-        "level": "state",
-        "benefit": "A$250/year (2 years)",
-        "region": "TAS",
-    },
-    {
-        "id": "tas_cds",
-        "name": "Tasmania Recycle Rewards (CDS)",
-        "level": "state",
-        "benefit": "A$0.10 per container",
-        "region": "TAS",
+        "description": "An annual payment of $56 to assist pensioners with the cost of heating their homes.",
+        "amount": 56,
+        "location": "TAS",
+        "income_max": 75000
     },
     # NT
     {
         "id": "nt_energy_rebate",
         "name": "Northern Territory Electricity Rebate",
-        "level": "territory",
-        "benefit": "A$350/year",
-        "region": "NT",
-    },
-    {
-        "id": "nt_cds",
-        "name": "Northern Territory Container Deposit Scheme",
-        "level": "territory",
-        "benefit": "A$0.10 per container",
-        "region": "NT",
-    },
+        "description": "A direct rebate of $350 applied annually to household electricity bills.",
+        "amount": 350,
+        "location": "NT",
+        "income_max": 300000
+    }
 ]
 
-print("Seeding full Australian rebates dataset…")
-for r in rebates:
+print("Seeding full Australian rebates dataset...")
+# Clear the existing collection for a fresh start
+try:
+    for doc in db.collection("rebates").stream():
+        doc.reference.delete()
+    print("Cleared existing rebates collection.")
+except Exception as e:
+    print(f"Could not clear collection (it may not exist yet): {e}")
+
+# Seed the new data
+for rebate in rebates:
     try:
-        db.collection("rebates").document(r["id"]).set(r)
-        print(f" Seeded: {r['id']}")
+        db.collection("rebates").document(rebate["id"]).set(rebate)
+        print(f"  Seeded: {rebate['id']}")
     except Exception as e:
-        print(f" ⇢ Failed to seed {r['id']}: {e}")
+        print(f"  ⇢ Failed to seed {rebate['id']}: {e}")
+
 print("Seeding complete.")

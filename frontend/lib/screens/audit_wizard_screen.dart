@@ -1,27 +1,27 @@
 // lib/screens/audit_wizard_screen.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'home_screen.dart'; // 1. IMPORT THE HOME SCREEN
+import 'package:firebase_auth/firebase_auth.dart';
+import 'home_screen.dart'; // Import for navigation
 
 class AuditWizardScreen extends StatefulWidget {
   const AuditWizardScreen({super.key});
-
   @override
-  State<AuditWizardScreen> createState() => _AuditWizardScreenState();
+  _AuditWizardScreenState createState() => _AuditWizardScreenState();
 }
 
 class _AuditWizardScreenState extends State<AuditWizardScreen> {
   int _currentStep = 0;
   final Map<String, dynamic> _answers = {};
-  bool _isLoading = false; // 2. ADD LOADING STATE
+  bool _isLoading = false;
+
+  // Conditional logic for Step 4
+  bool get _showHeatingQuestions =>
+      _answers['insulation'] == 'poor' || _answers['insulation'] == 'average';
 
   Future<void> _submitAudit() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: User not logged in.')));
-      return;
-    }
+    if (user == null) return;
 
     setState(() => _isLoading = true);
 
@@ -33,60 +33,105 @@ class _AuditWizardScreenState extends State<AuditWizardScreen> {
       });
 
       if (mounted) {
-        // 3. USE ROBUST NAVIGATION
-        // This clears the old screens and navigates to a fresh HomeScreen.
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Audit saved successfully!')));
+        // Use robust navigation to a fresh HomeScreen instance
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) =>  HomeScreen()),
+          MaterialPageRoute(builder: (context) => HomeScreen()),
               (route) => false,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save audit: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error saving audit: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  bool get _showHeatingQuestion => _answers['insulation'] == 'poor';
+  // --- Input Validation Logic ---
+  bool _validateStep(int step) {
+    switch (step) {
+      case 0:
+        return _answers.containsKey('fridge_age');
+      case 1:
+        return _answers.containsKey('insulation');
+      case 2: // This is Step 3
+      // --- THIS IS THE FIX ---
+      // We now correctly check for the 'window_type' key.
+        return _answers.containsKey('window_type');
+      case 3:
+        if (_showHeatingQuestions) {
+          // This was missing validation, now added.
+          return _answers.containsKey('heating_type');
+        }
+        return true; // No validation needed if questions are hidden
+      case 4:
+        return _answers.containsKey('water_heater');
+      default:
+        return true;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Self-Audit Wizard'),
-      ),
+      appBar: AppBar(title: const Text('Self-Audit Wizard')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Stepper(
-        type: StepperType.vertical,
         currentStep: _currentStep,
         onStepContinue: () {
-          if (_currentStep < 4) {
-            setState(() => _currentStep++);
+          if (_validateStep(_currentStep)) {
+            if (_currentStep < 4) {
+              setState(() => _currentStep++);
+            } else {
+              _submitAudit();
+            }
           } else {
-            _submitAudit();
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Please answer the question to continue.'),
+                backgroundColor: Colors.red));
           }
         },
         onStepCancel: () {
-          if (_currentStep > 0) {
-            setState(() => _currentStep--);
-          }
+          if (_currentStep > 0) setState(() => _currentStep--);
+        },
+        controlsBuilder: (context, details) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 16.0),
+            child: Row(
+              children: [
+                if (details.currentStep > 0)
+                  ElevatedButton(
+                    onPressed: details.onStepCancel,
+                    child: const Text('Back'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
+                  ),
+                const Spacer(),
+                ElevatedButton(
+                  onPressed: details.onStepContinue,
+                  child: Text(details.currentStep == 4 ? 'Submit' : 'Next'),
+                ),
+              ],
+            ),
+          );
         },
         steps: [
           _buildStep1Appliances(),
           _buildStep2Insulation(),
           _buildStep3Windows(),
           _buildStep4Heating(),
-          _buildStep5Summary(),
+          _buildStep5Miscellaneous(),
         ],
       ),
     );
   }
 
-  // --- Helper methods to build each step ---
-  // (These methods _buildStep1Appliances, etc., are unchanged)
+  // --- WIDGETS FOR EACH STEP ---
+
   Step _buildStep1Appliances() {
     return Step(
       title: const Text('Step 1: Appliances'),
@@ -124,7 +169,7 @@ class _AuditWizardScreenState extends State<AuditWizardScreen> {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('How would you rate your home\'s insulation?'),
+          const Text('What is the quality of your home insulation?'),
           RadioListTile<String>(
             title: const Text('Good'),
             value: 'good',
@@ -159,14 +204,14 @@ class _AuditWizardScreenState extends State<AuditWizardScreen> {
           RadioListTile<String>(
             title: const Text('Single-pane'),
             value: 'single',
-            groupValue: _answers['windows'],
-            onChanged: (value) => setState(() => _answers['windows'] = value),
+            groupValue: _answers['window_type'],
+            onChanged: (value) => setState(() => _answers['window_type'] = value),
           ),
           RadioListTile<String>(
             title: const Text('Double-pane'),
             value: 'double',
-            groupValue: _answers['windows'],
-            onChanged: (value) => setState(() => _answers['windows'] = value),
+            groupValue: _answers['window_type'],
+            onChanged: (value) => setState(() => _answers['window_type'] = value),
           ),
         ],
       ),
@@ -176,42 +221,63 @@ class _AuditWizardScreenState extends State<AuditWizardScreen> {
 
   Step _buildStep4Heating() {
     return Step(
-      title: const Text('Step 4: Heating/Cooling'),
+      title: const Text('Step 4: Heating & Cooling'),
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_showHeatingQuestion)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Your insulation is poor. How efficient is your heating system?'),
-                Slider(
-                  value: (_answers['heating_efficiency'] ?? 50.0).toDouble(),
-                  min: 0,
-                  max: 100,
-                  divisions: 10,
-                  label: (_answers['heating_efficiency'] ?? 50.0).toInt().toString(),
-                  onChanged: (value) => setState(() => _answers['heating_efficiency'] = value),
-                ),
-              ],
-            )
-          else
-            const Text('Your insulation rating is good enough that we don\'t need more heating details.'),
+          if (_showHeatingQuestions) ...[
+            const Text('What type of heating system do you use?'),
+            RadioListTile<String>(
+              title: const Text('Gas Furnace'),
+              value: 'gas_furnace',
+              groupValue: _answers['heating_type'],
+              onChanged: (value) => setState(() => _answers['heating_type'] = value),
+            ),
+            RadioListTile<String>(
+              title: const Text('Electric Heat Pump'),
+              value: 'heat_pump',
+              groupValue: _answers['heating_type'],
+              onChanged: (value) => setState(() => _answers['heating_type'] = value),
+            ),
+            RadioListTile<String>(
+              title: const Text('Other Electric'),
+              value: 'electric_other',
+              groupValue: _answers['heating_type'],
+              onChanged: (value) => setState(() => _answers['heating_type'] = value),
+            ),
+          ] else
+            const Text('Your insulation is good, so no extra heating questions are needed.'),
         ],
       ),
       isActive: _currentStep >= 3,
     );
   }
 
-  Step _buildStep5Summary() {
+  Step _buildStep5Miscellaneous() {
     return Step(
-      title: const Text('Step 5: Summary'),
+      title: const Text('Step 5: Miscellaneous'),
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Please review your answers before submitting:'),
-          const SizedBox(height: 10),
-          Text(_answers.toString()),
+          const Text('What type of water heater do you have?'),
+          RadioListTile<String>(
+            title: const Text('Electric Storage'),
+            value: 'electric_storage',
+            groupValue: _answers['water_heater'],
+            onChanged: (value) => setState(() => _answers['water_heater'] = value),
+          ),
+          RadioListTile<String>(
+            title: const Text('Gas Storage'),
+            value: 'gas_storage',
+            groupValue: _answers['water_heater'],
+            onChanged: (value) => setState(() => _answers['water_heater'] = value),
+          ),
+          RadioListTile<String>(
+            title: const Text('Heat Pump'),
+            value: 'heat_pump_wh',
+            groupValue: _answers['water_heater'],
+            onChanged: (value) => setState(() => _answers['water_heater'] = value),
+          ),
         ],
       ),
       isActive: _currentStep >= 4,
