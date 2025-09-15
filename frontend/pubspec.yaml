@@ -24,6 +24,7 @@ dependencies:
   provider: ^6.1.2
   http: ^1.2.1
   flutter_dotenv: ^6.0.0
+  fl_chart: ^0.69.0
 
 # Dependencies for development and testing only.
 dev_dependencies:
