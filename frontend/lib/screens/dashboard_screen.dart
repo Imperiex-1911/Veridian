@@ -8,18 +8,20 @@ import 'package:fl_chart/fl_chart.dart';
 
 // (Models are unchanged)
 class AuditAnswers {
-  final String fridgeAge; final String insulation; final String windowType; final String hvacAge;
-  final bool hasSolar; final bool hasDryer; final bool hasDishwasher;
+  final String fridgeAge; final String insulation; final String windowType;
+  final String hvacAge; final bool hasSolar; final bool hasDryer;
+  final bool hasDishwasher;
   AuditAnswers({ required this.fridgeAge, required this.insulation, required this.windowType, required this.hvacAge, required this.hasSolar, required this.hasDryer, required this.hasDishwasher });
-  factory AuditAnswers.fromMap(Map<String, dynamic> map) { /* ... same as before ... */
+  factory AuditAnswers.fromMap(Map<String, dynamic> map) {
     return AuditAnswers(fridgeAge: map['fridge_age'] ?? 'new', insulation: map['insulation'] ?? 'good', windowType: map['window_type'] ?? 'double', hvacAge: map['hvac_age'] ?? 'new', hasSolar: map['has_solar'] ?? false, hasDryer: map['has_dryer'] ?? false, hasDishwasher: map['has_dishwasher'] ?? false);
   }
-  Map<String, dynamic> toMap() { // Helper to convert back to a map for sending
+  Map<String, dynamic> toMap() {
     return {'fridge_age': fridgeAge, 'insulation': insulation, 'window_type': windowType, 'hvac_age': hvacAge, 'has_solar': hasSolar, 'has_dryer': hasDryer, 'has_dishwasher': hasDishwasher};
   }
 }
-class Emissions { /* ... same as before ... */
-  final double appliances; final double heatingCooling; final double waterHeater; final double windows; final double solar; final double total;
+class Emissions {
+  final double appliances; final double heatingCooling; final double waterHeater;
+  final double windows; final double solar; final double total;
   Emissions({ required this.appliances, required this.heatingCooling, required this.waterHeater, required this.windows, required this.solar, required this.total });
   factory Emissions.fromJson(Map<String, dynamic> json) { return Emissions(appliances: (json['appliances'] ?? 0).toDouble(), heatingCooling: (json['heating_cooling'] ?? 0).toDouble(), waterHeater: (json['water_heater'] ?? 0).toDouble(), windows: (json['windows'] ?? 0).toDouble(), solar: (json['solar'] ?? 0).toDouble(), total: (json['total'] ?? 0).toDouble()); }
 }
@@ -29,7 +31,7 @@ class DashboardService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Future<AuditAnswers?> fetchLatestAuditAnswers() async { /* ... same as before ... */
+  Future<AuditAnswers?> fetchLatestAuditAnswers() async {
     final user = _auth.currentUser; if (user == null) return null;
     final snapshot = await _firestore.collection('audits').where('user_id', isEqualTo: user.uid).orderBy('timestamp', descending: true).limit(1).get();
     if (snapshot.docs.isEmpty) return null;
@@ -37,16 +39,19 @@ class DashboardService {
     return AuditAnswers.fromMap(data);
   }
 
-  // --- MODIFIED: fetchEmissions now takes the answers as an argument ---
-  Future<Emissions?> fetchEmissions(AuditAnswers answers) async {
+  // --- MODIFIED: fetchEmissions now takes both userId and answers ---
+  Future<Emissions?> fetchEmissions(String userId, AuditAnswers answers) async {
     final user = _auth.currentUser;
     if (user == null) return null;
     final idToken = await user.getIdToken();
     final response = await http.post(
       Uri.parse('https://veridian-api-1jzx.onrender.com/carbon/calculate'),
       headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $idToken'},
-      // --- MODIFIED: The body now contains the answers map ---
-      body: jsonEncode({'answers': answers.toMap()}),
+      // --- MODIFIED: The body now contains BOTH the userId and the answers ---
+      body: jsonEncode({
+        'user_id': userId, // The missing field
+        'answers': answers.toMap()
+      }),
     );
 
     if (response.statusCode == 200) {
@@ -56,8 +61,10 @@ class DashboardService {
   }
 }
 
-class DashboardScreen extends StatefulWidget { /* ... same as before ... */
-  const DashboardScreen({super.key}); @override _DashboardScreenState createState() => _DashboardScreenState();
+class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key});
+  @override
+  _DashboardScreenState createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
@@ -70,20 +77,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() { super.initState(); _dataFuture = _fetchData(); }
 
-  // --- MODIFIED: The fetch logic is now sequential ---
   Future<void> _fetchData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
     setState(() { _errorMessage = null; });
     try {
-      // 1. First, fetch the audit answers
       final auditAnswers = await _service.fetchLatestAuditAnswers();
       if (auditAnswers == null) {
-        // No audit found, so we stop here
         if (mounted) setState(() { _auditAnswers = null; _emissions = null; });
         return;
       }
 
-      // 2. THEN, if successful, pass the answers to fetchEmissions
-      final emissions = await _service.fetchEmissions(auditAnswers);
+      // --- MODIFIED: Pass the user.uid to the service call ---
+      final emissions = await _service.fetchEmissions(user.uid, auditAnswers);
 
       if (mounted) {
         setState(() {
@@ -97,7 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // (The rest of the file is unchanged)
-  List<String> _generateRecommendations(AuditAnswers answers) { /* ... same as before ... */
+  List<String> _generateRecommendations(AuditAnswers answers) {
     List<String> recommendations = [];
     if (answers.fridgeAge == 'old') recommendations.add('Upgrade your old refrigerator to an energy-efficient model.');
     if (answers.insulation == 'poor') recommendations.add('Improve your home insulation to reduce heating and cooling costs.');
@@ -108,14 +115,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (recommendations.isEmpty) recommendations.add("You're doing great! No immediate high-priority recommendations.");
     return recommendations;
   }
-  List<PieChartSectionData> _createChartSections(Emissions emissions) { /* ... same as before ... */
+  List<PieChartSectionData> _createChartSections(Emissions emissions) {
     final data = [{'category': 'Appliances', 'value': emissions.appliances, 'color': Colors.blue},{'category': 'Heating/Cooling', 'value': emissions.heatingCooling, 'color': Colors.red},{'category': 'Water Heater', 'value': emissions.waterHeater, 'color': Colors.orange},{'category': 'Windows', 'value': emissions.windows, 'color': Colors.purple},];
     return data.where((d) => d['value'] as double > 0).map((item) {
       final value = item['value'] as double; final color = item['color'] as Color;
       return PieChartSectionData(value: value, title: '${value.toInt()}', color: color, radius: 80, titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white));
     }).toList();
   }
-  @override Widget build(BuildContext context) { /* ... same as before ... */
+  @override Widget build(BuildContext context) {
     return Scaffold(body: RefreshIndicator(onRefresh: _fetchData, child: FutureBuilder(future: _dataFuture, builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting) { return const Center(child: CircularProgressIndicator()); }
       if (_errorMessage != null) { return Center(child: Text('An error occurred: $_errorMessage')); }
