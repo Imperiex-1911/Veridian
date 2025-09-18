@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dashboard_screen.dart';
 import 'rebates_screen.dart';
 import 'audit_wizard_screen.dart';
+import 'contractors_screen.dart';
+import 'chat_screen.dart'; // 1. Import the new chat screen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,11 +17,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  // The list of screens controlled by the BottomNavigationBar
+  // 2. Add the ChatScreen to the list of navigable screens
   static const List<Widget> _screens = <Widget>[
     DashboardScreen(),
     RebatesScreen(),
     AuditWizardScreen(),
+    ContractorsScreen(),
+    ChatScreen(), // New screen added here
   ];
 
   void _onItemTapped(int index) {
@@ -28,23 +32,18 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // The function to handle signing out
   Future<void> _signOut() async {
     await FirebaseAuth.instance.signOut();
-    // The AuthWrapper will automatically navigate to the LoginScreen.
   }
 
   @override
   Widget build(BuildContext context) {
-    // A list of titles corresponding to each screen for the AppBar
-    const List<String> _titles = ['Dashboard', 'Rebates', 'Self-Audit'];
+    // 3. Add "AI Advisor" to the list of titles for the AppBar
+    const List<String> _titles = ['Dashboard', 'Rebates', 'Self-Audit', 'Contractors', 'AI Advisor'];
 
     return Scaffold(
-      // 1. APPBAR ADDED
       appBar: AppBar(
-        // 2. DYNAMIC TITLE
         title: Text(_titles[_selectedIndex]),
-        // 3. LOGOUT BUTTON ADDED
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -57,22 +56,32 @@ class _HomeScreenState extends State<HomeScreen> {
         child: _screens.elementAt(_selectedIndex),
       ),
       bottomNavigationBar: BottomNavigationBar(
+        // The 'fixed' type is essential for 4 or more items
+        type: BottomNavigationBarType.fixed,
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard', // Changed from 'Home' for consistency
+            icon: Icon(Icons.dashboard_outlined),
+            label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.local_offer),
+            icon: Icon(Icons.local_offer_outlined),
             label: 'Rebates',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.edit_document),
             label: 'Audit',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.build_outlined),
+            label: 'Contractors',
+          ),
+          // 4. Add the new navigation item for the AI Advisor
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline),
+            label: 'Advisor',
+          ),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).primaryColor,
         onTap: _onItemTapped,
       ),
     );

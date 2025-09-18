@@ -2,7 +2,7 @@
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import auth, users, rebates, carbon, contractors
+from routes import auth, users, rebates, carbon, contractors, chat
 
 # ----------------------------
 # Logging Configuration
@@ -41,6 +41,7 @@ app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(rebates.router, prefix="/rebates", tags=["Rebates"])
 app.include_router(carbon.router, prefix="/carbon", tags=["Carbon"])
 app.include_router(contractors.router, prefix="/contractors", tags=["Contractors"])
+app.include_router(chat.router, prefix="/chat", tags=["Chat"]) 
 
 # ----------------------------
 # Root Endpoint
