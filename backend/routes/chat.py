@@ -55,10 +55,39 @@ REDIS_URL = os.getenv("REDIS_URL")  # e.g. redis://localhost:6379/0
 MAX_INPUT_LEN = int(os.getenv("CHAT_MAX_INPUT_LEN", 1000))
 
 # Hugging Face configuration
-HF_MODEL = os.getenv("HF_MODEL", "mistralai/Mistral-7B-Instruct-v0.2")
-HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
-HF_API_TOKEN = None  # will be resolved at startup/get_token()
 
+# Load model + API URL
+HF_MODEL = os.getenv("HF_MODEL", "google/flan-t5-base").strip()
+HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+
+# Token resolution
+HF_API_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN")
+if not HF_API_TOKEN:
+    logger.error("Missing Hugging Face API token! Set HUGGINGFACE_API_TOKEN in environment.")
+    raise RuntimeError("No Hugging Face token configured")
+
+# Headers with token
+HF_HEADERS = {"Authorization": f"Bearer {HF_API_TOKEN}"}
+
+# Optional backup model
+FALLBACK_MODEL = "google/flan-t5-small"
+
+def verify_model_access(model_name: str) -> bool:
+    """Ping Hugging Face model to check if available."""
+    url = f"https://api-inference.huggingface.co/models/{model_name}"
+    resp = requests.get(url, headers=HF_HEADERS, timeout=10)
+    if resp.status_code == 200:
+        logger.info(f"Hugging Face model '{model_name}' is accessible ✅")
+        return True
+    else:
+        logger.warning(f"Model '{model_name}' not accessible ({resp.status_code})")
+        return False
+
+# At startup, verify primary model
+if not verify_model_access(HF_MODEL) and FALLBACK_MODEL:
+    logger.info(f"Falling back to {FALLBACK_MODEL}")
+    HF_MODEL = FALLBACK_MODEL
+    HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
 # Requests session with retry/backoff
 _session = requests.Session()
 _retries = Retry(total=3, backoff_factor=0.6, status_forcelist=[429, 500, 502, 503, 504])
