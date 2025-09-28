@@ -21,6 +21,12 @@ app = FastAPI(
     version="1.0.0",
     description="API for rebates, contractors, carbon tracking, and user management."
 )
+# --- ADD THIS STARTUP EVENT ---
+@app.on_event("startup")
+async def startup_event():
+    """Initializes services on application startup."""
+    # This will connect to Redis if the REDIS_URL is set in your environment
+    await chat.init_redis()
 
 # ----------------------------
 # Middleware
