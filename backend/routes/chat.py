@@ -29,7 +29,7 @@ try:
     if not gemini_api_key:
         raise ValueError("GEMINI_API_KEY environment variable not set.")
     genai.configure(api_key=gemini_api_key)
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-1.0-pro')
 except Exception as e:
     logger.error(f"Failed to configure Gemini API: {e}")
     model = None
